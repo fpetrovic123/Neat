@@ -6,10 +6,7 @@
 package main;
 
 import threads.ThreadMainSimulation;
-import java.awt.Dimension;
-import javax.swing.JFrame;
-import static utility.Utility.SIRINA;
-import static utility.Utility.VISINA;
+
 
 
 /**
@@ -23,6 +20,8 @@ private static String args1[];
      */
     public MainForm() {
         initComponents();
+        this.setLocationRelativeTo(null);
+        this.setTitle("Title");
     }
 
     /**

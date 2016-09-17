@@ -1,5 +1,8 @@
 package main;
 
+import fbird.Cell;
+import fbird.Finch;
+import fbird.Pipe;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -16,6 +19,7 @@ import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -24,237 +28,207 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import neat.Genom;
 import neat.Neuron;
-import neat.OsnovneInfomacije;
-import neat.Vrsta;
-import neat.Sinapsa;
-import fb.Celija;
-import fb.Cev;
-import fb.Ptica;
-
-import static utility.Utility.FONT;
-import static utility.Utility.SIRINA;
-import static utility.Utility.VISINA;
-
-import static utility.Utility.PTICA_SIRINA;
-import static utility.Utility.PTICA_VISINA;
-import static utility.Utility.POD_SIRINA;
-import static utility.Utility.POD_DUZINA;
-import static utility.Utility.POD_ODSTUPANJE;
-import static utility.Utility.POD_BRZINA;
-import static utility.Utility.CEV_SIRINA;
-import static utility.Utility.CEV_VISINA;
-import static utility.Utility.CEVI_RAZMAK;
-import static neat.OsnovneInfomacije.POPULACIJA;
-import static neat.OsnovneInfomacije.INPUTI;
-import static neat.OsnovneInfomacije.OUTPUT;
-import static utility.Utility.POZADINA_IMAGE;
-import static utility.Utility.ZEMLJA_IMAGE;
-import static utility.Utility.CEV1_IMAGE;
-import static utility.Utility.CEV2_IMAGE;
+import neat.StartingInfo;
+import neat.Group;
+import neat.Synapse;
+import static utility.Utility.*;
+import static neat.StartingInfo.POPULATION;
+import static neat.StartingInfo.NUMBER_OF_IMPUTS;
+import static neat.StartingInfo.NUMBER_OF_OUTPUTS;
 
 public class NEAT extends JPanel implements Runnable {
 
+    public static int globalScore = 0;
+  
     
-public static int globalScore = 0;
-
-public static final Random randomize = new Random();
-
- 
-
-
-
     public static void main(final String[] args) {
         final JFrame frame = new JFrame();
-        frame.setResizable(true);
+        frame.setResizable(false);
         frame.setTitle("Simulation");
-        frame.setPreferredSize(new Dimension(SIRINA, VISINA));
-        
-         NEAT neat = new NEAT();
+        frame.setPreferredSize(new Dimension(utility.Utility.WIDTH1, utility.Utility.HEIGHT1));
+        NEAT neat = new NEAT();
         frame.add(neat);
         frame.pack();
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
         neat.run();
-        
-        
     }
+    
+    public static final Random randomize = new Random();
+    private final List<Finch> birds = new LinkedList<>();
+    private final List<Pipe> pipes = new ArrayList<>();
+
+    private int speedOfSettingPipes;
+    private int tick;
+    private int tickOfPipes;
 
 
-    private int brzinaPostavnjanjaCevi;
-    private int takt;
-    private int taktCevi;
+    private Finch bestBird;
+    private int  localScore;
 
+    public void evolution() {
 
-    private Ptica najboljaPtica;
-    private int  skorLokalni;
+        Pipe nextPipe = null;
 
-    public void evaluacija() {
+        for (final Pipe pipe : pipes)
+            if (pipe.getPosition() + PIPE_W > WIDTH1 / 3 - B_W/  2
+                    && (nextPipe == null || pipe.getPosition() < nextPipe.getPosition()))
+                nextPipe = pipe;
 
-        Cev sledecaCev = null;
-
-        for (final Cev cev : cevi)
-            if (cev.pozicija + CEV_SIRINA > SIRINA / 3 - PTICA_SIRINA / 2
-                    && (sledecaCev == null || cev.pozicija < sledecaCev.pozicija))
-                sledecaCev = cev;
-//PTICE
-
-for (final Ptica ptica : ptice) {
-            if (ptica.mrtva)
+for (final Finch bird : birds) {
+            if (bird.deadBird)
                 continue;
-// INPUTI U   MREZU 
+
             final double[] input = new double[4];
-            input[0] = ptica.visina / VISINA;
-            if (sledecaCev == null) {
+            input[0] = bird.hightBird / HEIGHT1;
+            if (nextPipe == null) {
                 input[1] = 0.5;
                 input[2] = 1.0;
             } else {
-                input[1] = sledecaCev.visinaCevi / VISINA;
-                input[2] = sledecaCev.pozicija / SIRINA;
+                input[1] = nextPipe.getHeightPipe() / HEIGHT1;
+                input[2] = nextPipe.getPosition() / WIDTH1;
             }
             
-// INPUT TESIRANJE ZBOG IMPLEMENTACIJE
 
             input[3] = 1.0;
             
 // NEAT OPALJIVANJE
 //TODO: NAJZNACAJNIJE DVE LINIJE KODA!!!!!!!!!!!
 
-            final double[] output = ptica.gen.evaulacijaMrezeGen(input);
+            final double[] output = bird.genom.evolutionOfNetwork(input);
             if (output[0] > 0.5)
-                ptica.leti = true;
+                bird.flaying = true;
         }
     }
 
-    public void inicijalizujIgru() {
+    public void initializeGame() {
         
         // Brzina stvaranja cevi sto manji broj to se brze stvaraju tubes.
         // Tik igre
         // Tik tube brizna stvaranja
         //Scor
-        brzinaPostavnjanjaCevi = 75;
-        takt = 0;
-        taktCevi = 0;
+        speedOfSettingPipes = 75;
+        tick = 0;
+        tickOfPipes = 0;
 
-        najboljaPtica = null;
+        bestBird = null;
         
-        skorLokalni = 0;
+        localScore = 0;
 
-        ptice.clear();
-        for (final Vrsta vrsta : OsnovneInfomacije.vrste)
-            for (final Genom genom : vrsta.genomi) {
-                genom.generisiMrezu();
-                ptice.add(new Ptica(vrsta, genom));
+        birds.clear();
+        for (final Group group : StartingInfo.groups)
+            for (final Genom genom : group.genoms) {
+                genom.generateNetwork();
+                birds.add(new Finch(group, genom));
             }
-        cevi.clear();
+        pipes.clear();
     }
 
     
-    public void nauci() {
+    public void learn() {
         
-        najboljaPtica = ptice.get(0);
+        bestBird = birds.get(0);
         
-        boolean sveMrtve = true;
+        boolean allDead = true;
         
-        for (final Ptica ptica : ptice) {
-            if (ptica.mrtva)
+        for (final Finch bird : birds) {
+            if (bird.deadBird)
                 continue;
-            sveMrtve = false;
+            allDead = false;
 
-            double fitnestNauci = takt - ptica.brojMahanjaKrilima * 1.5;
-            fitnestNauci = fitnestNauci == 0.0 ? -1.0 : fitnestNauci;
+            double fitnessLearn = tick - bird.numberBH * 1.5;
+            fitnessLearn = fitnessLearn == 0.0 ? -1.0 : fitnessLearn;
 
-            ptica.gen.fitnest = fitnestNauci;
-            if (fitnestNauci > OsnovneInfomacije.maksimalniFitnest)
-                OsnovneInfomacije.maksimalniFitnest = fitnestNauci;
+            bird.genom.setFitness(fitnessLearn);
+            if (fitnessLearn > StartingInfo.maxFitness)
+                StartingInfo.maxFitness = fitnessLearn;
 
-            if (fitnestNauci > najboljaPtica.gen.fitnest)
-                najboljaPtica = ptica;
+            if (fitnessLearn > bestBird.genom.getFitness())
+                bestBird = bird;
         }
 
-        if (sveMrtve) {
-            OsnovneInfomacije.newGeneration();
-            inicijalizujIgru();
+        if (allDead) {
+            StartingInfo.newGeneration();
+            initializeGame();
         }
     }
 ///UPDATE IGRE SAME!
     public void update() {
-        ++takt;
-        ++taktCevi;
+        ++tick;
+        ++tickOfPipes;
 
-        if (taktCevi == brzinaPostavnjanjaCevi) {
-            final int visina = POD_ODSTUPANJE + 100
-                    + randomize.nextInt(VISINA - 200 - CEVI_RAZMAK - POD_ODSTUPANJE);
-            cevi.add(new Cev(visina));
-            taktCevi = 0;
+        if (tickOfPipes == speedOfSettingPipes) {
+            final int visina = F_OFFSET + 100
+                    + randomize.nextInt(HEIGHT1 - 200 - EMPTY_SPACE - F_OFFSET);
+            pipes.add(new Pipe(visina));
+            tickOfPipes = 0;
         }
 
-        final Iterator<Cev> it = cevi.iterator();
+        final Iterator<Pipe> it = pipes.iterator();
         while (it.hasNext()) {
             
-            final Cev cev = it.next();
-            cev.pozicija -= POD_BRZINA;
-            if (cev.pozicija + CEV_SIRINA < 0.0)
+            final Pipe pipe = it.next();
+            pipe.setPosition(pipe.getPosition()-F_SPEED);
+            if (pipe.getPosition() + PIPE_W < 0.0)
                 it.remove();
-            if (!cev.proslaCev && cev.pozicija + CEV_SIRINA < SIRINA / 3
-                    - PTICA_SIRINA / 2) {
-                ++skorLokalni;
-                if (skorLokalni % 10 == 0) {
-                    brzinaPostavnjanjaCevi -= 5;
-                    brzinaPostavnjanjaCevi = Math.max(brzinaPostavnjanjaCevi, 20);
+            if (!pipe.isPass() && pipe.getPosition() + PIPE_W < WIDTH1 / 3
+                    - B_W / 2) {
+                ++localScore;
+                if (localScore % 10 == 0) {
+                    speedOfSettingPipes -= 5;
+                    speedOfSettingPipes = Math.max(speedOfSettingPipes, 20);
                 }
-                if(skorLokalni>globalScore){
-                    globalScore=skorLokalni;
+                if(localScore>globalScore){
+                    globalScore=localScore;
                 }
-                cev.proslaCev = true;
+                pipe.setPass(true);
             }
         }
 
-        for (final Ptica ptica : ptice) {
-            if (ptica.mrtva)
+        for (final Finch bird : birds) {
+            if (bird.deadBird)
                 continue;
 
-            if (ptica.leti) {
-                ptica.kurs = 10;
-                ptica.leti = false;
-                ++ptica.brojMahanjaKrilima;
+            if (bird.flaying) {
+                bird.directionBird = 10;
+                bird.flaying = false;
+                ++bird.numberBH;
             }
 
-            ptica.visina += ptica.kurs;
-            ptica.kurs -= 0.98;
-            ptica.ugao = 3.0 * ptica.kurs;
-            ptica.ugao = Math.max(-90.0, Math.min(90.0, ptica.ugao));
+            bird.hightBird += bird.directionBird;
+            bird.directionBird -= 0.98;
+            bird.angleOfBird = 3.0 * bird.directionBird;
+            bird.angleOfBird = Math.max(-90.0, Math.min(90.0, bird.angleOfBird));
 
-            if (ptica.visina > VISINA) {
-              ptica.mrtva= true;
+            if (bird.hightBird > HEIGHT1) {
+              bird.deadBird= true;
             }
-            if (ptica.visina < POD_ODSTUPANJE + PTICA_VISINA / 2)
-                ptica.mrtva = true;
+            if (bird.hightBird < F_OFFSET + B_H / 2)
+                bird.deadBird = true;
 
             final AffineTransform at = new AffineTransform();
-            at.translate(SIRINA / 3 - PTICA_VISINA / 2, VISINA - ptica.visina);
-            at.rotate(-ptica.ugao / 180.0 * Math.PI, PTICA_SIRINA / 2,
-                    PTICA_VISINA / 2);
+            at.translate(WIDTH1 / 3 - B_H / 2, HEIGHT1 - bird.hightBird);
+            at.rotate(-bird.angleOfBird / 180.0 * Math.PI, B_W / 2,
+                    B_H / 2);
             at.translate(0, 36);
             
             
-            final Shape granice = new GeneralPath(GRANICE)
+            final Shape borders = new GeneralPath(GRANICE)
                     .createTransformedShape(at);
             
-            
-            
-            for (final Cev tube : cevi) {
-                final Rectangle2D pravugaonikCevi = new Rectangle2D.Double(
-                        tube.pozicija,
-                        VISINA - tube.visinaCevi - CEVI_RAZMAK - CEV_VISINA,
-                        CEV_SIRINA, CEV_VISINA);
+            for (final Pipe tube : pipes) {
+                final Rectangle2D rectanglePipe = new Rectangle2D.Double(
+                        tube.getPosition(),
+                        HEIGHT1 - tube.getHeightPipe() - EMPTY_SPACE - PIPE_H,
+                        PIPE_W, PIPE_H);
                 final Rectangle2D floorTube = new Rectangle2D.Double(
-                        tube.pozicija, VISINA - tube.visinaCevi, CEV_SIRINA,
-                        CEV_VISINA);
+                        tube.getPosition(), HEIGHT1 - tube.getHeightPipe(), PIPE_W,
+                        PIPE_H);
                 
 //NIJE NEKA VALIDACIJA !
-                if (granice.intersects(pravugaonikCevi)
-                        || granice.intersects(floorTube)) {
-                    ptica.mrtva = true;
+                if (borders.intersects(rectanglePipe)
+                        || borders.intersects(floorTube)) {
+                    bird.deadBird = true;
                     break;
                 }
             }
@@ -263,18 +237,19 @@ for (final Ptica ptica : ptice) {
 
 @Override
     public void run() {
-        OsnovneInfomacije.initializePool();
-
-        inicijalizujIgru();
+        StartingInfo.initializePool();
+        
+        initializeGame();
+        
         while (true) {
            
     //EValuacija  proverena 
            
-            evaluacija();
+            evolution();
 //PROVERENA
             update();
             
-            nauci();
+            learn();
 
             repaint();
             try {
@@ -285,8 +260,7 @@ for (final Ptica ptica : ptice) {
     }
 
     
-    private final List<Ptica> ptice = new ArrayList<>();
-    private final List<Cev> cevi = new ArrayList<>();
+ 
 
 
 
@@ -296,60 +270,63 @@ for (final Ptica ptica : ptice) {
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
 
-        g2d.drawImage(POZADINA_IMAGE, 0, 0, SIRINA, VISINA, null);
+        g2d.drawImage(BIRD_IMAGE, 0, 0, WIDTH1, HEIGHT1, null);
 
 //CRTANJE CEVI 1  i 2 
-        for (final Cev cev : cevi) {
-            g2d.drawImage(CEV1_IMAGE, (int) cev.pozicija,
-                    VISINA - (int) cev.visinaCevi - CEVI_RAZMAK - CEV_VISINA,
-                    CEV_SIRINA, CEV_VISINA, null);
-            g2d.drawImage(CEV2_IMAGE, (int) cev.pozicija,
-                    VISINA - (int) cev.visinaCevi, CEV_SIRINA, CEV_VISINA, null);
+        for (final Pipe pipe : pipes) {
+            g2d.drawImage(PIPE1_IMAGE, (int) pipe.getPosition(),
+                    HEIGHT1 - (int) pipe.getHeightPipe() - EMPTY_SPACE - PIPE_H,
+                    PIPE_W, PIPE_H, null);
+            g2d.drawImage(PIPE2_IMAGE, (int) pipe.getPosition(),
+                    HEIGHT1 - (int) pipe.getHeightPipe(), PIPE_W, PIPE_H, null);
         }
         
 //CRTANJE PODA         
 
-        g2d.drawImage(ZEMLJA_IMAGE,
-                -(POD_BRZINA * takt % (SIRINA - POD_SIRINA)),
-                VISINA - POD_ODSTUPANJE, POD_SIRINA, POD_DUZINA, null);
+        g2d.drawImage(EARTH,
+                -(F_SPEED * tick % (WIDTH1 - F_W)),
+                HEIGHT1 - F_OFFSET, F_W, F_H, null);
 
         
 //CRTANJE PTICA        
         
-        int zive = 0;
+        int alive = 0;
         
 //SAMO GORE I DOLE ! PTICA
 
-        final int animacija = takt / 3 % 3;
-        for (final Ptica bird : ptice) {
+        final int animation = tick / 3 % 3;
+    try{
+        for (final Finch bird : birds) {
             
-            if (bird.mrtva)
+            if (bird.deadBird)
                 continue;
-            ++zive;
+            ++alive;
             final AffineTransform at = new AffineTransform();
-            at.translate(SIRINA / 3 - PTICA_VISINA / 3, VISINA - bird.visina);
-            at.rotate(-bird.ugao / 180.0 * Math.PI, PTICA_SIRINA / 2,
-                    PTICA_VISINA / 2);
-            g2d.drawImage(bird.images[animacija], at, null);
+            at.translate(WIDTH1 / 3 - B_H / 3, HEIGHT1 - bird.hightBird);
+            at.rotate(-bird.angleOfBird / 180.0 * Math.PI, B_W / 2,
+                    B_H / 2);
+            g2d.drawImage(bird.imagesBird[animation], at, null);
             
         }
+    }
+    catch(Exception ex){}
 //POZICIONIRANJE SCORA KOLIKO JE PROSAO CEVI! 
 
-        final Font skorFont = FONT.deriveFont(50f);
-        g2d.setFont(skorFont);
+        final Font scoreFont = FONT.deriveFont(50f);
+        g2d.setFont(scoreFont);
         
-        final String skorTekst = Integer.toString(skorLokalni);
-        final GlyphVector glyphsVector = skorFont
-                .createGlyphVector(g2d.getFontRenderContext(), skorTekst);
+        final String scoreText = Integer.toString(localScore);
+        final GlyphVector glyphsVector = scoreFont
+                .createGlyphVector(g2d.getFontRenderContext(), scoreText);
         
 
        
         
-        final Rectangle2D skorOkvir = glyphsVector.getVisualBounds();
+        final Rectangle2D scoreBorder = glyphsVector.getVisualBounds();
         
-        final int skorX = SIRINA / 2 - (int) skorOkvir.getWidth() / 2;
-        final int skorY = VISINA / 6 + (int) skorOkvir.getHeight() / 2;
-        final Shape outline = glyphsVector.getOutline(skorX, skorY);
+        final int scoreX = WIDTH1 / 2 - (int) scoreBorder.getWidth() / 2;
+        final int scoreY = HEIGHT1 / 6 + (int) scoreBorder.getHeight() / 2;
+        final Shape outline = glyphsVector.getOutline(scoreX, scoreY);
         
         
         
@@ -357,16 +334,16 @@ for (final Ptica ptica : ptice) {
         g2d.setColor(Color.BLACK);
         g2d.draw(outline);
         g2d.setColor(Color.WHITE);
-        g2d.drawString(skorTekst, skorX, skorY);
+        g2d.drawString(scoreText, scoreX, scoreY);
         g2d.setStroke(new BasicStroke(1f));
         
         //POZICIONIRANJE GLOBALNOG SOCRA KOLIKO JE DOSADA NAJVISE USPELO
             
-        final Font globalniSkorFont =FONT.deriveFont(20f);
-        g2d.setFont(globalniSkorFont);
+        final Font globalScoreFont =FONT.deriveFont(20f);
+        g2d.setFont(globalScoreFont);
         
         final String globalScoreText=Integer.toString(globalScore);
-        final GlyphVector glV=skorFont.createGlyphVector(g2d.getFontRenderContext(), globalScoreText);
+        final GlyphVector glV=scoreFont.createGlyphVector(g2d.getFontRenderContext(), globalScoreText);
         
         final int gSkorX=420;
         final int gSkorY= 150;
@@ -378,19 +355,19 @@ for (final Ptica ptica : ptice) {
         final int minX = 30;
         final int maxX =  200;
 
-        final Map<Integer, Celija> mreza = new HashMap<Integer, Celija>();
-        if(najboljaPtica!=null){
-        for (final Entry<Integer, Neuron> entry : najboljaPtica.gen.mreza
+        final Map<Integer, Cell> network = new HashMap<Integer, Cell>();
+        if(bestBird!=null){
+        for (final Entry<Integer, Neuron> entry : bestBird.genom.network
                 .entrySet()) {
             
             final int i = entry.getKey();
             final Neuron neuron = entry.getValue();
             final int x;
             final int y;
-            if (i < OsnovneInfomacije.INPUTI) {
+            if (i < StartingInfo.NUMBER_OF_IMPUTS) {
                 x = 15;
                 y = 15 + 20 * i;
-            } else if (entry.getKey() < INPUTI + OUTPUT) {
+            } else if (entry.getKey() < NUMBER_OF_IMPUTS + NUMBER_OF_OUTPUTS) {
                 x = 200 - 47;
                 y = 80;
                 int opacity = 0x80000000;
@@ -401,85 +378,86 @@ for (final Ptica ptica : ptice) {
                 x = (minX + maxX) / 2;
                 y = 80;
             }
-            mreza.put(i, new Celija(x, y, neuron.Value));
+            network.put(i, new Cell(x, y, neuron.Value));
         }
 
         for (int n = 0; n < 4; ++n)
-            for (final Sinapsa gene : najboljaPtica.gen.genLinkVeza)
-                if (gene.omogucen) {
-                    final Celija c1 = mreza.get(gene.input);
-                    final Celija c2 = mreza.get(gene.output);
-                    if (gene.input >= INPUTI + OUTPUT) {
-                        c1.x = (int) (0.75 * c1.x + 0.25 * c2.x);
-                        if (c1.x >= c2.x)
-                            c1.x = c1.x - 60;
-                        if (c1.x < minX)
-                            c1.x = minX;
-                        if (c1.x > maxX)
-                            c1.x = maxX;
-                        c1.y = (int) (0.75 * c1.y + 0.25 * c2.y);
+            for (final Synapse genom : bestBird.genom.genomLink)
+                if (genom.isEnabled) {
+                    final Cell c1 = network.get(genom.input);
+                    final Cell c2 = network.get(genom.output);
+                    if (genom.input >= NUMBER_OF_IMPUTS + NUMBER_OF_OUTPUTS) {
+                        c1.setX((int)(0.75*c1.getX()+0.25*c2.getX()));
+                        
+                        if (c1.getX() >= c2.getX())
+                            c1.setX(c1.getX() - 60);
+                        if (c1.getX() < minX)
+                            c1.setX(minX);
+                        if (c1.getX() > maxX)
+                            c1.setX(maxX);
+                        c1.setY((int) (0.75 * c1.getY() + 0.25 * c2.getY()));
                     }
-                    if (gene.output >= INPUTI + OUTPUT) {
-                        c2.x = (int) (0.25 * c1.x + 0.75 * c2.x);
-                        if (c1.x >= c2.x)
-                            c2.x = c2.x + 60;
-                        if (c2.x < minX)
-                            c2.x = minX;
-                        if (c2.x > maxX)
-                            c2.x = maxX;
-                        c2.y = (int) (0.25 * c1.y + 0.75 * c2.y);
+                    if (genom.output >= NUMBER_OF_IMPUTS + NUMBER_OF_OUTPUTS) {
+                        c2.setX( (int) (0.25 * c1.getX() + 0.75 * c2.getX())); 
+                        if (c1.getX() >= c2.getX())
+                            c2.setX(c2.getX() + 60);
+                        if (c2.getX() < minX)
+                            c2.setX(minX);
+                        if (c2.getY() > maxX)
+                            c2.setX(maxX);
+                        c2.setY((int) (0.25 * c1.getY() + 0.75 * c2.getY()));
                     }
                 }
 
-        for (final Sinapsa gene : najboljaPtica.gen.genLinkVeza)
-            if (gene.omogucen) {
-                final Celija c1 = mreza.get(gene.input);
-                final Celija c2 = mreza.get(gene.output);
+        for (final Synapse gene : bestBird.genom.genomLink)
+            if (gene.isEnabled) {
+                final Cell c1 = network.get(gene.input);
+                final Cell c2 = network.get(gene.output);
                 final float vrednost = (float) Math
-                        .abs(Neuron.sigmoidFunkcija(gene.tezina));
+                        .abs(Neuron.sigmoidFunction(gene.weight));
                 final Color color;
-                if (Neuron.sigmoidFunkcija(gene.tezina) > 0.0)
+                if (Neuron.sigmoidFunction(gene.weight) > 0.0)
                     color = Color.getHSBColor(2f / 3f, 1f, vrednost);
                 else
                     color = Color.getHSBColor(0f, 1f, vrednost);
                 g2d.setColor(new Color(color.getRed(), color.getGreen(),
                         color.getBlue(), 0x80));
-                g2d.drawLine(c1.x + 8, c1.y + 5, c2.x + 2, c2.y + 5);
+                g2d.drawLine(c1.getX() + 8, c1.getY() + 5, c2.getX() + 2, c2.getY() + 5);
             }
        
 
-        for (final Celija celija : mreza.values())
-            printCelije(g2d, celija);
+        for (final Cell cell : network.values())
+            printCell(g2d, cell);
 
         g2d.setColor(new Color(0x80000000, true));
         g2d.setFont(FONT.deriveFont(14f));
         
-        g2d.drawString("Generacija " + OsnovneInfomacije.generacija, 20, 120);
+        g2d.drawString("Generacija " + StartingInfo.generation, 20, 120);
         Dimension d = getBounds(g2d, g2d.getFont(),
-                "Žive " + zive + "/" + POPULACIJA);
-        g2d.drawString("Žive " + zive + "/" + POPULACIJA, 20,
+                "Žive " + alive + "/" + POPULATION);
+        g2d.drawString("Žive " + alive + "/" + POPULATION, 20,
                 140);
         d = getBounds(g2d, g2d.getFont(),
-                "Ukupan fitnest" + najboljaPtica.gen.fitnest + "/" + OsnovneInfomacije.maksimalniFitnest);
-        g2d.drawString("Ukupan fitnest " + najboljaPtica.gen.fitnest + "/" + OsnovneInfomacije.maksimalniFitnest,
+                "Ukupan fitnest" + bestBird.genom.getFitness() + "/" + StartingInfo.maxFitness);
+        g2d.drawString("Ukupan fitnest " + bestBird.genom.getFitness() + "/" + StartingInfo.maxFitness,
                 20, 160);
          }
     }
     
     
-    public void printCelije(final Graphics2D g2d, final Celija celija) {
+    public void printCell(final Graphics2D g2d, final Cell cell) {
         
-        final float vrednost = (float) Math.abs(celija.vrednost);
+        final float vrednost = (float) Math.abs(cell.getValueOfCell());
         final Color color;
-        if (celija.vrednost > 0.0)
+        if (cell.getValueOfCell() > 0.0)
             color = Color.getHSBColor(2f / 3f, 1f, vrednost);
         else
             color = Color.getHSBColor(0f, 1f, vrednost);
         g2d.setColor(new Color(color.getRed(), color.getGreen(),
                 color.getBlue(), 0x80));
-        g2d.fillRect(celija.x, celija.y, 10, 10);
+        g2d.fillRect(cell.getX(), cell.getY(), 10, 10);
         g2d.setColor(g2d.getColor().darker().darker());
-        g2d.drawRect(celija.x, celija.y, 10, 10);
+        g2d.drawRect(cell.getX(), cell.getY(), 10, 10);
     }
     
     

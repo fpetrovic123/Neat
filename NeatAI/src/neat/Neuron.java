@@ -5,7 +5,7 @@ import java.util.List;
 
 public class Neuron {
     
-    public static double sigmoidFunkcija(final double x) {
+    public static double sigmoidFunction(final double x) {
         return 2.0 / (1.0 + Math.exp(-4.9 * x)) - 1.0;
         
         //OBEZBEDJUJEM DA UVEK BUDE VECE OD 1> PREMA PAPIRIMA!
@@ -14,5 +14,5 @@ public class Neuron {
     
     
     
-    public final List<Sinapsa> Inputs = new ArrayList<Sinapsa>();
+    public final List<Synapse> Inputs = new ArrayList<Synapse>();
 }

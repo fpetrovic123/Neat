@@ -1,18 +1,16 @@
 package neat;
 
-import static neat.OsnovneInfomacije.BIAS_MUTATION;
-import static neat.OsnovneInfomacije.CONN_MUTATION;
-import static neat.OsnovneInfomacije.DELTA_DISJOINT;
-import static neat.OsnovneInfomacije.DELTA_THRESHOLD;
-import static neat.OsnovneInfomacije.DELTA_WEIGHTS;
-import static neat.OsnovneInfomacije.DISABLE_MUTATION;
-import static neat.OsnovneInfomacije.ENABLE_MUTATION;
-import static neat.OsnovneInfomacije.LINK_MUTATION;
-import static neat.OsnovneInfomacije.NODE_MUTATION;
-import static neat.OsnovneInfomacije.PERTURBATION;
-import static neat.OsnovneInfomacije.STEP_SIZE;
-import static neat.OsnovneInfomacije.rnd;
-
+import static neat.StartingInfo.BIAS_MUTATION;
+import static neat.StartingInfo.CONN_MUTATION;
+import static neat.StartingInfo.DELTA_DISJOINT;
+import static neat.StartingInfo.DELTA_THRESHOLD;
+import static neat.StartingInfo.DELTA_WEIGHTS;
+import static neat.StartingInfo.DISABLE_MUTATION;
+import static neat.StartingInfo.ENABLE_MUTATION;
+import static neat.StartingInfo.LINK_MUTATION;
+import static neat.StartingInfo.NODE_MUTATION;
+import static neat.StartingInfo.PERTURBATION;
+import static neat.StartingInfo.STEP_SIZE;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -20,276 +18,306 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import static neat.OsnovneInfomacije.INPUTI;
-import static neat.OsnovneInfomacije.OUTPUT;
+import static neat.StartingInfo.NUMBER_OF_IMPUTS;
+import static neat.StartingInfo.NUMBER_OF_OUTPUTS;
+import static neat.StartingInfo.random;
 
 public class Genom {
    
 
-    public final List<Sinapsa>  genLinkVeza         = new ArrayList<Sinapsa>();
-    public double               fitnest       = 0.0;
-    public int                  maxNeurona     = 0;
-    public int                  globalnaPozicija    = 0;
+    private double fitness=0.0;
+    private int maxN=0;
+    private int gRank=0;
+
+    public Genom() {
+            fitness = 0.0;
+            maxN=0;
+            gRank=0;
+    }
+
+    public double getFitness() {
+        return fitness;
+    }
     
-    
+    public final List<Synapse>  genomLink         = new ArrayList<>();
+
+    public void setFitness(double fitness) {
+        this.fitness = fitness;
+    }
+
+    public int getMaxN() {
+        return maxN;
+    }
+
+    public void setMaxN(int maxN) {
+        this.maxN = maxN;
+    }
+
+    public int getgRank() {
+        return gRank;
+    }
+
+    public void setgRank(int gRank) {
+        this.gRank = gRank;
+    }
     
     
     @Override
     public Genom clone() {
         final Genom genom = new Genom();
-        for (final Sinapsa gene : genLinkVeza)
-            genom.genLinkVeza.add(gene.clone());
-        genom.maxNeurona = maxNeurona;
+        for (final Synapse gene : genomLink)
+            genom.genomLink.add(gene.clone());
+        genom.maxN = maxN;
         for (int i = 0; i < 7; ++i)
-            genom.mutacija[i] = mutacija[i];
+            genom.arrayMutation[i] = arrayMutation[i];
         return genom;
     }
     
     
 
-    public boolean sadrziLink(final Sinapsa link) {
-        for (final Sinapsa gene : this.genLinkVeza)
-            if (gene.input == link.input && gene.output == link.output)
+    public boolean hasLink(final Synapse link) {
+        for (final Synapse genom : this.genomLink)
+            if (genom.input == link.input && genom.output == link.output)
                 return true;
         return false;
     }
 
     public double disjoint(final Genom genom) {
         double disjoinGen = 0.0;
-        search: for (final Sinapsa gene : genLinkVeza) {
-            for (final Sinapsa drugiGen : genom.genLinkVeza)
-                if (gene.inovacija == drugiGen.inovacija)
+        search: for (final Synapse gene : genomLink) {
+            for (final Synapse drugiGen : genom.genomLink)
+                if (gene.inovation == drugiGen.inovation)
                     continue search;
             ++disjoinGen;
         }
-        return disjoinGen / Math.max(genLinkVeza.size(), genom.genLinkVeza.size());
+        return disjoinGen / Math.max(genomLink.size(), genom.genomLink.size());
     }
     
     
-    public final double[]       mutacija = new double[] { CONN_MUTATION,
+    public final double[]       arrayMutation = new double[] { CONN_MUTATION,
             LINK_MUTATION, BIAS_MUTATION, NODE_MUTATION, ENABLE_MUTATION,
             DISABLE_MUTATION, STEP_SIZE };
     
-    public Map<Integer, Neuron> mreza       = null;
+    public Map<Integer, Neuron> network       = null;
 
-    public double[] evaulacijaMrezeGen(final double[] input) {
-        for (int i = 0; i < INPUTI; ++i)
-            mreza.get(i).Value = input[i];
+    public double[] evolutionOfNetwork(final double[] input) {
+        for (int i = 0; i < NUMBER_OF_IMPUTS; ++i)
+            network.get(i).Value = input[i];
         
 
-        for (final Entry<Integer, Neuron> entry : mreza.entrySet()) {
-            if (entry.getKey() < INPUTI + OUTPUT)
+        for (final Entry<Integer, Neuron> entry : network.entrySet()) {
+            if (entry.getKey() < NUMBER_OF_IMPUTS + NUMBER_OF_OUTPUTS)
                 continue;
             final Neuron neuron = entry.getValue();
             double sum = 0.0;
-            for (final Sinapsa dolazecaSin : neuron.Inputs) {
-                final Neuron drugiNeuron = mreza.get(dolazecaSin.input);
-                sum += dolazecaSin.tezina * drugiNeuron.Value;
+            for (final Synapse inc : neuron.Inputs) {
+                final Neuron anotherNeuron = network.get(inc.input);
+                sum += inc.weight * anotherNeuron.Value;
             }
 //Jer ako nema veze predstavlja output
 
             if (!neuron.Inputs.isEmpty())
-                neuron.Value = Neuron.sigmoidFunkcija(sum);
+                neuron.Value = Neuron.sigmoidFunction(sum);
         }
 //OUTP funkcije 
-        for (final Entry<Integer, Neuron> entry : mreza.entrySet()) {
-            if (entry.getKey() < INPUTI || entry.getKey() >= INPUTI + OUTPUT)
+        for (final Entry<Integer, Neuron> entry : network.entrySet()) {
+            if (entry.getKey() < NUMBER_OF_IMPUTS || entry.getKey() >= NUMBER_OF_IMPUTS + NUMBER_OF_OUTPUTS)
                 continue;
             final Neuron neuron = entry.getValue();
             double sum = 0.0;
-            for (final Sinapsa dolazecaSin:  neuron.Inputs) {
-                final Neuron drugiNeuron = mreza.get(dolazecaSin.input);
-                sum += dolazecaSin.tezina * drugiNeuron.Value;
+            for (final Synapse incS:  neuron.Inputs) {
+                final Neuron drugiNeuron = network.get(incS.input);
+                sum += incS.weight * drugiNeuron.Value;
             }
 
             if (!neuron.Inputs.isEmpty())
-                neuron.Value = Neuron.sigmoidFunkcija(sum);
+                neuron.Value = Neuron.sigmoidFunction(sum);
         }
 
-        final double[] output = new double[OUTPUT];
-        for (int i = 0; i < OUTPUT; ++i)
-            output[i] = mreza.get(INPUTI + i).Value;
+        final double[] output = new double[NUMBER_OF_OUTPUTS];
+        for (int i = 0; i < NUMBER_OF_OUTPUTS; ++i)
+            output[i] = network.get(NUMBER_OF_IMPUTS + i).Value;
         return output;
     }
 
-    public void generisiMrezu() {
-        mreza = new HashMap<Integer, Neuron>();
-        for (int i = 0; i < INPUTI; ++i)
-            mreza.put(i, new Neuron());
-        for (int i = 0; i < OUTPUT; ++i)
-            mreza.put(INPUTI + i, new Neuron());
+    public void generateNetwork() {
+        network = new HashMap<Integer, Neuron>();
+        for (int i = 0; i < NUMBER_OF_IMPUTS; ++i)
+            network.put(i, new Neuron());
+        for (int i = 0; i < NUMBER_OF_OUTPUTS; ++i)
+            network.put(NUMBER_OF_IMPUTS + i, new Neuron());
 
         
         
-        Collections.sort(genLinkVeza, new Comparator<Sinapsa>() {
+        Collections.sort(genomLink, new Comparator<Synapse>() {
 
             @Override
-            public int compare(final Sinapsa o1, final Sinapsa o2) {
+            public int compare(final Synapse o1, final Synapse o2) {
                 return o1.output - o2.output;
             }
         });
-        for (final Sinapsa gen : genLinkVeza)
-            if (gen.omogucen) {
-                if (!mreza.containsKey(gen.output))
-                    mreza.put(gen.output, new Neuron());
-                final Neuron neuron = mreza.get(gen.output);
+        for (final Synapse gen : genomLink)
+            if (gen.isEnabled) {
+                if (!network.containsKey(gen.output))
+                    network.put(gen.output, new Neuron());
+                final Neuron neuron = network.get(gen.output);
                 neuron.Inputs.add(gen);
-                if (!mreza.containsKey(gen.input))
-                    mreza.put(gen.input, new Neuron());
+                if (!network.containsKey(gen.input))
+                    network.put(gen.input, new Neuron());
             }
     }
 
-    public void mutacijaGena() {
+    public void mutationOfGene() {
         
        
         for (int i = 0; i < 7; ++i)
-            mutacija[i] *= rnd.nextBoolean() ? 0.95 : 1.05263;
+            arrayMutation[i] *= random.nextBoolean() ? 0.95 : 1.05263;
 
-        if (rnd.nextDouble() < mutacija[0]) 
-            mutacijaTacke();
+        if (random.nextDouble() < arrayMutation[0]) 
+            mutationPoint();
 
-        double prob = mutacija[1];
+        double prob = arrayMutation[1];
         while (prob > 0) {
-            if (rnd.nextDouble() < prob)
+            if (random.nextDouble() < prob)
                 mutateLink(false);
             --prob;
         }
 
-        prob = mutacija[2];
+        prob = arrayMutation[2];
         while (prob > 0) {
-            if (rnd.nextDouble() < prob)
+            if (random.nextDouble() < prob)
                 mutateLink(true);
             --prob;
         }
 
-        prob = mutacija[3];
+        prob = arrayMutation[3];
         while (prob > 0) {
-            if (rnd.nextDouble() < prob)
+            if (random.nextDouble() < prob)
                 mutateNode();
             --prob;
         }
 
-        prob = mutacija[4];
+        prob = arrayMutation[4];
         while (prob > 0) {
-            if (rnd.nextDouble() < prob)
+            if (random.nextDouble() < prob)
                 mutateEnableDisable(true);
             --prob;
         }
 
-        prob = mutacija[5];
+        prob = arrayMutation[5];
         while (prob > 0) {
-            if (rnd.nextDouble() < prob)
+            if (random.nextDouble() < prob)
                 mutateEnableDisable(false);
             --prob;
         }
     }
 
     public void mutateEnableDisable(final boolean enable) {
-        final List<Sinapsa> candidates = new ArrayList<Sinapsa>();
-        for (final Sinapsa gene : genLinkVeza)
-            if (gene.omogucen != enable)
+        final List<Synapse> candidates = new ArrayList<Synapse>();
+        for (final Synapse gene : genomLink)
+            if (gene.isEnabled != enable)
                 candidates.add(gene);
 
         if (candidates.isEmpty())
             return;
 
-        final Sinapsa gene = candidates.get(rnd.nextInt(candidates.size()));
-        gene.omogucen = !gene.omogucen;
+        final Synapse gene = candidates.get(random.nextInt(candidates.size()));
+        gene.isEnabled = !gene.isEnabled;
     }
 
     public void mutateLink(final boolean forceBias) {
         final int neuron1 = randomNeuron(false, true);
         final int neuron2 = randomNeuron(true, false);
 
-        final Sinapsa newLink = new Sinapsa();
+        final Synapse newLink = new Synapse();
         newLink.input = neuron1;
         newLink.output = neuron2;
 
         if (forceBias)
-            newLink.input = INPUTI - 1;
+            newLink.input = NUMBER_OF_IMPUTS - 1;
 
-        if (sadrziLink(newLink))
+        if (hasLink(newLink))
             return;
 
-        newLink.inovacija = ++OsnovneInfomacije.inovacija;
-        newLink.tezina = rnd.nextDouble() * 4.0 - 2.0;
+        newLink.inovation = ++StartingInfo.inovation;
+        newLink.weight = random.nextDouble() * 4.0 - 2.0;
 
-        genLinkVeza.add(newLink);
+        genomLink.add(newLink);
     }
 
     public void mutateNode() {
-        if (genLinkVeza.isEmpty())
+        if (genomLink.isEmpty())
             return;
 
-        final Sinapsa gene = genLinkVeza.get(rnd.nextInt(genLinkVeza.size()));
-        if (!gene.omogucen)
+        final Synapse gene = genomLink.get(random.nextInt(genomLink.size()));
+        if (!gene.isEnabled)
             return;
-        gene.omogucen = false;
+        gene.isEnabled = false;
 
-        ++maxNeurona;
+        ++maxN;
 
-        final Sinapsa gene1 = gene.clone();
-        gene1.output = maxNeurona;
-        gene1.tezina = 1.0;
-        gene1.inovacija = ++OsnovneInfomacije.inovacija;
-        gene1.omogucen = true;
-        genLinkVeza.add(gene1);
+        final Synapse genom1 = gene.clone();
+        genom1.output = maxN;
+        genom1.weight = 1.0;
+        genom1.inovation = ++StartingInfo.inovation;
+        genom1.isEnabled = true;
+        genomLink.add(genom1);
 
-        final Sinapsa gene2 = gene.clone();
-        gene2.input = maxNeurona;
-        gene2.inovacija = ++OsnovneInfomacije.inovacija;
-        gene2.omogucen = true;
-        genLinkVeza.add(gene2);
+        final Synapse genom2 = gene.clone();
+        genom2.input = maxN;
+        genom2.inovation = ++StartingInfo.inovation;
+        genom2.isEnabled = true;
+        genomLink.add(genom2);
     }
 
-    public void mutacijaTacke() {
-        for (final Sinapsa gene : genLinkVeza)
-            if (rnd.nextDouble() < PERTURBATION)
-                gene.tezina += rnd.nextDouble() * mutacija[6] * 2.0
-                        - mutacija[6];
+    public void mutationPoint() {
+        for (final Synapse gene : genomLink)
+            if (random.nextDouble() < PERTURBATION)
+                gene.weight += random.nextDouble() * arrayMutation[6] * 2.0
+                        - arrayMutation[6];
             else
-                gene.tezina = rnd.nextDouble() * 4.0 - 2.0;
+                gene.weight = random.nextDouble() * 4.0 - 2.0;
     }
 
     public int randomNeuron(final boolean nonInput, final boolean nonOutput) {
         final List<Integer> neurons = new ArrayList<Integer>();
 
         if (!nonInput)
-            for (int i = 0; i < INPUTI; ++i)
+            for (int i = 0; i < NUMBER_OF_IMPUTS; ++i)
                 neurons.add(i);
 
         if (!nonOutput)
-            for (int i = 0; i < OUTPUT; ++i)
-                neurons.add(INPUTI + i);
+            for (int i = 0; i < NUMBER_OF_OUTPUTS; ++i)
+                neurons.add(NUMBER_OF_IMPUTS + i);
 
-        for (final Sinapsa gene : genLinkVeza) {
-            if ((!nonInput || gene.input >= INPUTI)
-                    && (!nonOutput || gene.input >= INPUTI + OUTPUT))
+        for (final Synapse gene : genomLink) {
+            if ((!nonInput || gene.input >= NUMBER_OF_IMPUTS)
+                    && (!nonOutput || gene.input >= NUMBER_OF_IMPUTS + NUMBER_OF_OUTPUTS))
                 neurons.add(gene.input);
-            if ((!nonInput || gene.output >= INPUTI)
-                    && (!nonOutput || gene.output >= INPUTI + OUTPUT))
+            if ((!nonInput || gene.output >= NUMBER_OF_IMPUTS)
+                    && (!nonOutput || gene.output >= NUMBER_OF_IMPUTS + NUMBER_OF_OUTPUTS))
                 neurons.add(gene.output);
         }
 
-        return neurons.get(rnd.nextInt(neurons.size()));
+        return neurons.get(random.nextInt(neurons.size()));
     }
 
-    public boolean istaVrsta(final Genom genom) {
+    public boolean sameGroup(final Genom genom) {
         final double dd = DELTA_DISJOINT * disjoint(genom);
-        final double dw = DELTA_WEIGHTS * tezine(genom);
+        final double dw = DELTA_WEIGHTS * weights(genom);
         return dd + dw < DELTA_THRESHOLD;
     }
 
-    public double tezine(final Genom genom) {
+    public double weights(final Genom genom) {
         double sum = 0.0;
-        double slucajnost = 0.0;
-        search: for (final Sinapsa gene : genLinkVeza)
-            for (final Sinapsa drugiGen : genom.genLinkVeza)
-                if (gene.inovacija == drugiGen.inovacija) {
-                    sum += Math.abs(gene.tezina - drugiGen.tezina);
-                    ++slucajnost;
+        double coincidence = 0.0;
+        search: for (final Synapse genom1 : genomLink)
+            for (final Synapse antoherGenom : genom.genomLink)
+                if (genom1.inovation == antoherGenom.inovation) {
+                    sum += Math.abs(genom1.weight - antoherGenom.weight);
+                    ++coincidence;
                     continue search;
                 }
-        return sum / slucajnost;
+        return sum / coincidence;
     }
 }
